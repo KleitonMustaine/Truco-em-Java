@@ -7,6 +7,10 @@ public class Jogador {
     public Jogador(String nome) {
         this.nome = nome;
     }
+    
+    public List<Carta> getMao() {
+    return mao;
+    }
 
     public void receberCarta(Carta carta) {
         mao.add(carta);

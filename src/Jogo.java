@@ -12,10 +12,33 @@ public class Jogo {
     int timeQuePediu = 1; 
     private boolean trucoJaPedido = false;
     int op;
+    private List<ConexaoJogador> conexoes; 
+    private Servidor servidor;
+    private Scanner s;
 
-    Scanner s = new Scanner(System.in);
 
+    //contrutor Local
+    public Jogo(Jogador j1, Jogador j2, Jogador j3, Jogador j4, Scanner scanner) {
+        this.j1 = j1;
+        this.j2 = j2;
+        this.j3 = j3;
+        this.j4 = j4;
+        this.s  = scanner;
+        this.servidor = null;
+        baralho = new Baralho();
+    }
 
+    // Construtor REDE
+    public Jogo(Jogador j1, Jogador j2, Jogador j3, Jogador j4,
+                List<ConexaoJogador> conexoes, Servidor servidor) {
+        this.j1       = j1;
+        this.j2       = j2;
+        this.j3       = j3;
+        this.j4       = j4;
+        this.conexoes = conexoes;
+        this.servidor = servidor;
+        baralho = new Baralho();
+    }
     
     public void adicionarPontos1(int pontos1) {
         this.pontos1 += pontos1;
@@ -57,27 +80,6 @@ public class Jogo {
         return c1.getValorBase() - c2.getValorBase();
     }
 
-
-    public Jogo() {
-        baralho = new Baralho();
-    }
-
-    public void CriarJogador(){
-
-        System.out.print("Nome do Jogador 1: ");
-        j1 = new Jogador(s.nextLine());
-
-        System.out.print("Nome do Jogador 2: ");
-        j2 = new Jogador(s.nextLine());
-
-        System.out.print("Nome do Jogador 3: ");
-        j3 = new Jogador(s.nextLine());
-
-        System.out.print("Nome do Jogador 4: ");
-        j4 = new Jogador(s.nextLine());
-
-    }
-
     public void iniciar() {
 
         j1.limparMao();
@@ -103,8 +105,8 @@ public class Jogo {
         System.out.println("Manilha: " + manilha);
 
         System.out.println("\n=== TIMES ===");
-        System.out.println("Time 1: " + j1.getNome() + " e " + j2.getNome());
-        System.out.println("Time 2: " + j3.getNome() + " e " + j4.getNome());
+        System.out.println("Time 1: " + j1.getNome() + " e " + j3.getNome());
+        System.out.println("Time 2: " + j2.getNome() + " e " + j4.getNome());
 
         rodadasTime1 = 0;
         rodadasTime2 = 0;
@@ -162,26 +164,53 @@ public class Jogo {
             System.out.println("\n" + j1.getNome());
             j1.mostrarMao();
             if (pedirTruco(1)) return;
-            System.out.print("Escolha carta: ");
-            Carta c1 = j1.jogarCarta(s.nextInt()-1);
+            System.out.print("Escolha carta (1, 2 ou 3): ");
+            int escolha1;
+            do {
+                escolha1 = s.nextInt();
+                if (escolha1 < 1 || escolha1 > j1.getMao().size())
+                    System.out.print("Inválido! Escolha novamente: ");
+            } while (escolha1 < 1 || escolha1 > j1.getMao().size());
+            Carta c1 = j1.jogarCarta(escolha1 - 1);
 
+            // J2
             System.out.println("\n" + j2.getNome());
             j2.mostrarMao();
-            if (pedirTruco(1)) return;
-            System.out.print("Escolha carta: ");
-            Carta c2 = j2.jogarCarta(s.nextInt()-1);
+            if (pedirTruco(2)) return;
+            System.out.print("Escolha carta (1, 2 ou 3): ");
+            int escolha2;
+            do {
+                escolha2 = s.nextInt();
+                if (escolha2 < 1 || escolha2 > j2.getMao().size())
+                    System.out.print("Inválido! Escolha novamente: ");
+            } while (escolha2 < 1 || escolha2 > j2.getMao().size());
+            Carta c2 = j2.jogarCarta(escolha2 - 1);
 
+            // J3
             System.out.println("\n" + j3.getNome());
             j3.mostrarMao();
-            if (pedirTruco(2)) return;
-            System.out.print("Escolha carta: ");
-            Carta c3 = j3.jogarCarta(s.nextInt()-1);
+            if (pedirTruco(1)) return;
+            System.out.print("Escolha carta (1, 2 ou 3): ");
+            int escolha3;
+            do {
+                escolha3 = s.nextInt();
+                if (escolha3 < 1 || escolha3 > j3.getMao().size())
+                    System.out.print("Inválido! Escolha novamente: ");
+            } while (escolha3 < 1 || escolha3 > j3.getMao().size());
+            Carta c3 = j3.jogarCarta(escolha3 - 1);
 
+            // J4
             System.out.println("\n" + j4.getNome());
             j4.mostrarMao();
             if (pedirTruco(2)) return;
-            System.out.print("Escolha carta: ");
-            Carta c4 = j4.jogarCarta(s.nextInt()-1);
+            System.out.print("Escolha carta (1, 2 ou 3): ");
+            int escolha4;
+            do {
+                escolha4 = s.nextInt();
+                if (escolha4 < 1 || escolha4 > j4.getMao().size())
+                    System.out.print("Inválido! Escolha novamente: ");
+            } while (escolha4 < 1 || escolha4 > j4.getMao().size());
+            Carta c4 = j4.jogarCarta(escolha4 - 1);
 
             System.out.println(j1.getNome() + " jogou: " + c1);
             System.out.println(j2.getNome() + " jogou: " + c2);
