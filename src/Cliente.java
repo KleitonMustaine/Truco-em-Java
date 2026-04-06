@@ -3,33 +3,44 @@ import java.net.*;
 import java.util.Scanner;
 
 public class Cliente {
-    public static void main (String[] args) throws IOException{
+
+    public static void main(String[] args) throws IOException {
+
         Scanner scanner = new Scanner(System.in);
         Socket socket = new Socket(Configuracao.IP_SERVIDOR, Configuracao.PORTA);
 
         PrintWriter saida = new PrintWriter(socket.getOutputStream(), true);
         BufferedReader entrada = new BufferedReader(
-            new InputStreamReader(socket.getInputStream())
+                new InputStreamReader(socket.getInputStream())
         );
+
         System.out.println("Conectado ao servidor!");
 
-        //recebe mensagens do servidor ao mesmo tempo que o jogador pode digitar
-        Thread recebedor = new Thread(() -> {
-            try{
-                String mensagem;
-                while ((mensagem = entrada.readLine())!=null){
-                    System.out.println(mensagem);
-                }
-            }catch(IOException e){
-                System.out.println("Conexao encerrada");
+        String mensagem;
+
+        // LOOP ÚNICO: lê mensagem → decide se responde
+        while ((mensagem = entrada.readLine()) != null) {
+            System.out.println(mensagem);
+
+            // PEDIR TRUCO
+            if (mensagem.contains("Deseja pedir truco")) {
+                String resp = scanner.nextLine();
+                saida.println(resp);
             }
-        });
-        recebedor.start();
-        //enviar ao servidor o que o jogador digitou
-        String input;
-        while ((input = scanner.nextLine())!=null) {
-            saida.println(input);
+
+            // ACEITAR TRUCO
+            else if (mensagem.contains("aceita o truco")) {
+                String resp = scanner.nextLine();
+                saida.println(resp);
+            }
+
+            // ESCOLHER CARTA
+            else if (mensagem.contains("Escolha uma carta")) {
+                String escolha = scanner.nextLine();
+                saida.println(escolha);
+            }
         }
+
         socket.close();
         scanner.close();
     }

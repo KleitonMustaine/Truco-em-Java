@@ -10,7 +10,6 @@ public class Jogo {
     private int rodadasTime1 = 0;
     private int rodadasTime2 = 0;
     private int valorMao = 1;
-    int timeQuePediu = 1; 
     private boolean trucoJaPedido = false;
     int op;
     private List<ConexaoJogador> conexoes; 
@@ -120,113 +119,116 @@ public class Jogo {
         rodadasTime1 = 0;
         rodadasTime2 = 0;
         valorMao = 1;
+        trucoJaPedido = false;
 
         rodada();
     }
 
-    private boolean pedirTruco(int timeQuePediu) throws IOException {
+    private boolean pedirTruco(int indiceJogador, int timeQuePediu) throws IOException {
 
-        if (valorMao == 12) return false;
+        if (trucoJaPedido || valorMao == 12) return false;
 
-        // Pega a conexão do jogador atual
-        ConexaoJogador conexaoAtual;
-        ConexaoJogador adversario1;
-        ConexaoJogador adversario2;
-
-        // Time 1 = conexoes 0 e 2, Time 2 = conexoes 1 e 3
-        if (timeQuePediu == 1) {
-            conexaoAtual = conexoes.get(0); // quem está jogando agora
-            adversario1  = conexoes.get(1);
-            adversario2  = conexoes.get(3);
-        } else {
-            conexaoAtual = conexoes.get(1);
-            adversario1  = conexoes.get(0);
-            adversario2  = conexoes.get(2);
-        }
-
-        // Pergunta se quer pedir truco
+        // =========================
+        // ===== MODO REDE ========
+        // =========================
         if (servidor != null) {
-            // REDE
-            conexaoAtual.enviar("Deseja pedir truco? (s/n): ");
-            String resp = conexaoAtual.recebe().trim();
 
-            if (resp.equalsIgnoreCase("s")) {
-                // Aumenta o valor
-                if (valorMao == 1)      valorMao = 3;
-                else if (valorMao == 3) valorMao = 6;
-                else if (valorMao == 6) valorMao = 9;
-                else if (valorMao == 9) valorMao = 12;
+            ConexaoJogador quemPede = conexoes.get(indiceJogador);
 
-                // Avisa todos
-                servidor.enviarParaTodos(
-                    "\n TRUCO pedido pelo Time " + timeQuePediu
-                    + "! Valendo " + valorMao + " pontos!"
-                );
+            // escolhe um adversário do outro time
+            ConexaoJogador adversario =
+                    (timeQuePediu == 1) ? conexoes.get(1) : conexoes.get(0);
 
-                // Pergunta para os dois adversários ao mesmo tempo
-                adversario1.enviar("Sua equipe aceita o truco? (s/n): ");
-                adversario2.enviar("Sua equipe aceita o truco? (s/n): ");
+            quemPede.enviar("Deseja pedir truco? (s/n): ");
 
-                // Pega a primeira resposta que chegar usando Thread
-                String[] resposta = {null}; // array para acessar dentro da Thread
+            String resp;
+            
+            do {
+                resp = quemPede.recebe();
+            } while (resp == null || resp.trim().isEmpty());
 
-                Thread t1 = new Thread(() -> {
-                    try {
-                        if (resposta[0] == null)
-                            resposta[0] = adversario1.recebe().trim();
-                    } catch (IOException e) {}
-                });
-
-                Thread t2 = new Thread(() -> {
-                    try {
-                        if (resposta[0] == null)
-                            resposta[0] = adversario2.recebe().trim();
-                    } catch (IOException e) {}
-                });
-
-                t1.start();
-                t2.start();
-
-                // Espera até uma resposta chegar
-                while (resposta[0] == null) {
-                    try { Thread.sleep(100); } catch (InterruptedException e) {}
-                }
-
-                if (resposta[0].equalsIgnoreCase("n")) {
-                    servidor.enviarParaTodos(" Time adversário correu!");
-                    if (timeQuePediu == 1) pontos1 += valorMao - 1;
-                    else pontos2 += valorMao - 1;
-                    return true; // encerra a mão
-                } else {
-                    servidor.enviarParaTodos(" Truco aceito! Valendo " + valorMao + " pontos!");
-                }
+            if (!resp.trim().equalsIgnoreCase("s")) {
+                return false;
             }
 
-        } else {
-            // LOCAL — igual ao que já tinha
-            System.out.println("Deseja pedir truco? (s/n)");
-            String resp = s.next().trim();
+            trucoJaPedido = true;
 
-            if (resp.equalsIgnoreCase("s")) {
-                if (valorMao == 1)      valorMao = 3;
-                else if (valorMao == 3) valorMao = 6;
-                else if (valorMao == 6) valorMao = 9;
-                else if (valorMao == 9) valorMao = 12;
-                System.out.println("Truco valendo " + valorMao + " pontos!");
+            int valorAnterior = valorMao;
+            int novoValor;
 
-                System.out.println("Time adversário aceita? (s/n)");
-                String resp2 = s.next().trim();
-
-                if (resp2.equalsIgnoreCase("n")) {
-                    System.out.println("Time correu!");
-                    if (timeQuePediu == 1) pontos1 += valorMao - 1;
-                    else pontos2 += valorMao - 1;
-                    return true;
-                }
+            switch (valorMao) {
+                case 1: novoValor = 3; break;
+                case 3: novoValor = 6; break;
+                case 6: novoValor = 9; break;
+                case 9: novoValor = 12; break;
+                default: return false;
             }
+
+            servidor.enviarParaTodos(
+                "\nTRUCO pedido pelo Time " + timeQuePediu + "!"
+            );
+
+            adversario.enviar("Aceitam o truco? (s/n): ");
+
+            String aceita;
+            do {
+                aceita = adversario.recebe();
+            } while (aceita == null || aceita.trim().isEmpty());
+
+            if (aceita.trim().equalsIgnoreCase("n")) {
+                servidor.enviarParaTodos("Time adversário correu!");
+
+                if (timeQuePediu == 1)
+                    pontos1 += valorAnterior;
+                else
+                    pontos2 += valorAnterior;
+
+                return true; // encerra a mão
+            }
+
+            valorMao = novoValor;
+            servidor.enviarParaTodos(
+                "Truco aceito! Agora valendo " + valorMao + " pontos!"
+            );
+
+            return false;
         }
+
+        // =========================
+        // ===== MODO LOCAL =======
+        // =========================
+        System.out.print("Deseja pedir truco? (s/n): ");
+        String resp = s.next().trim();
+
+        if (!resp.equalsIgnoreCase("s")) return false;
+
+        trucoJaPedido = true;
+
+        int valorAnterior = valorMao;
+
+        switch (valorMao) {
+            case 1: valorMao = 3; break;
+            case 3: valorMao = 6; break;
+            case 6: valorMao = 9; break;
+            case 9: valorMao = 12; break;
+            default: return false;
+        }
+
+        System.out.print("Time adversário aceita? (s/n): ");
+        String aceita = s.next().trim();
+
+        if (aceita.equalsIgnoreCase("n")) {
+            if (timeQuePediu == 1)
+                pontos1 += valorAnterior;
+            else
+                pontos2 += valorAnterior;
+            return true;
+        }
+
+        System.out.println("Truco aceito!");
         return false;
     }
+
     private int lerJogadaHost() {
         int escolha = s.nextInt() - 1;
         s.nextLine();
@@ -239,24 +241,24 @@ public class Jogo {
 
         for (int i = 0; i < 3; i++) {
 
-            // J1 — Time 1
+            // J1 — índice 0 — Time 1
+            if (pedirTruco(0, 1)) return;
             enviarMensagem("\n" + j1.getNome() + " escolha sua carta:");
-            if (pedirTruco(1)) return;
             Carta c1 = escolherCarta(j1, conexoes != null ? conexoes.get(0) : null);
 
-            // J2 — Time 2
+            // J2 — índice 1 — Time 2
+            if (pedirTruco(1, 2)) return;
             enviarMensagem("\n" + j2.getNome() + " escolha sua carta:");
-            if (pedirTruco(2)) return;
             Carta c2 = escolherCarta(j2, conexoes != null ? conexoes.get(1) : null);
 
-            // J3 — Time 1
+            // J3 — índice 2 — Time 1
+            if (pedirTruco(2, 1)) return;
             enviarMensagem("\n" + j3.getNome() + " escolha sua carta:");
-            if (pedirTruco(1)) return;
             Carta c3 = escolherCarta(j3, conexoes != null ? conexoes.get(2) : null);
 
-            // J4 — Time 2
+            // J4 — índice 3 — Time 2
+            if (pedirTruco(3, 2)) return;
             enviarMensagem("\n" + j4.getNome() + " escolha sua carta:");
-            if (pedirTruco(2)) return;
             Carta c4 = escolherCarta(j4, conexoes != null ? conexoes.get(3) : null);
 
             enviarMensagem(j1.getNome() + " jogou: " + c1);
