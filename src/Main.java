@@ -38,9 +38,9 @@ public class Main {
 
                 System.out.println("\n=== FIM DE JOGO ===");
                 if (jogo.getPontos1() >= 12) {
-                    System.out.println("🏆 Time 1 venceu!");
+                    System.out.println("Time 1 venceu!");
                 } else {
-                    System.out.println("🏆 Time 2 venceu!");
+                    System.out.println("Time 2 venceu!");
                 }
                 scanner.close();
                 break;
