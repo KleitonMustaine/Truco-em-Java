@@ -124,43 +124,36 @@ public class Jogo {
         rodada();
     }
 
-    private boolean pedirTruco(int timeQuePediu) {
-    
-    if (valorMao == 12) return false;
+    private boolean pedirTruco(int timeQuePediu) throws IOException {
 
-    if (servidor != null) return false;
+        if (valorMao == 12) return false;
 
-    System.out.println("Deseja pedir truco? (s/n)");
-    String resp = s.next().trim();
+        // ✅ Se for rede, desativa truco por enquanto
+        if (servidor != null) return false;
 
-    if (resp.equalsIgnoreCase("s")) {
+        System.out.println("Deseja pedir truco? (s/n)");
+        String resp = s.next().trim();
 
-        trucoJaPedido = true;
+        if (resp.equalsIgnoreCase("s")) {
 
-        if (valorMao == 1) valorMao = 3;
-        else if (valorMao == 3) valorMao = 6;
-        else if (valorMao == 6) valorMao = 9;
-        else if (valorMao == 9) valorMao = 12;
-        System.out.println("Truco valendo " + valorMao + " pontos!");
+            if (valorMao == 1) valorMao = 3;
+            else if (valorMao == 3) valorMao = 6;
+            else if (valorMao == 6) valorMao = 9;
+            else if (valorMao == 9) valorMao = 12;
+            System.out.println("Truco valendo " + valorMao + " pontos!");
 
-        System.out.println("Time adversário aceita? (s/n)");
-        String resp2 = s.next().trim();
+            System.out.println("Time adversário aceita? (s/n)");
+            String resp2 = s.next().trim();
 
-        if (resp2.equalsIgnoreCase("n")) {
-            System.out.println("Time correu!");
-
-            if (timeQuePediu == 1) {
-                pontos1 += valorMao;
-            } else {
-                pontos2 += valorMao;
+            if (resp2.equalsIgnoreCase("n")) {
+                System.out.println("Time correu!");
+                if (timeQuePediu == 1) pontos1 += valorMao;
+                else pontos2 += valorMao;
+                return true;
             }
-
-            return true;
         }
+        return false;
     }
-
-    return false;
-}
     private int lerJogadaHost() {
         int escolha = s.nextInt() - 1;
         s.nextLine();
