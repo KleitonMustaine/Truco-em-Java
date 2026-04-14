@@ -22,8 +22,13 @@ public class Cliente {
         while ((mensagem = entrada.readLine()) != null) {
             System.out.println(mensagem);
 
+            if(mensagem.contains("Digite seu nome")){
+                String resp = scanner.nextLine();
+                saida.println(resp);
+            }
+
             // PEDIR TRUCO
-            if (mensagem.contains("Deseja pedir truco")) {
+            else if (mensagem.contains("Deseja pedir truco")) {
                 String resp = scanner.nextLine();
                 saida.println(resp);
             }

@@ -1,5 +1,5 @@
-import java.net.*;
 import java.io.*;
+import java.net.*;
 
 public class ConexaoJogador{
     private Socket socket;
@@ -25,7 +25,7 @@ public class ConexaoJogador{
     public void enviarMao(){
         enviar("\n === SUA MAO ===");
         for(int i = 0; i< jogador.getMao().size();i++){
-            enviar("["+i+"]"+jogador.getMao().get(i));
+            enviar("["+(i+1)+"]"+jogador.getMao().get(i));
         }
     }
     public Jogador getJogador(){
