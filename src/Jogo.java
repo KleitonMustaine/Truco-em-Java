@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.util.*;
 
 public class Jogo {
@@ -9,13 +10,35 @@ public class Jogo {
     private int rodadasTime1 = 0;
     private int rodadasTime2 = 0;
     private int valorMao = 1;
-    int timeQuePediu = 1; 
     private boolean trucoJaPedido = false;
     int op;
+    private List<ConexaoJogador> conexoes; 
+    private Servidor servidor;
+    private Scanner s;
 
-    Scanner s = new Scanner(System.in);
 
+    //contrutor Local
+    public Jogo(Jogador j1, Jogador j2, Jogador j3, Jogador j4, Scanner scanner) {
+        this.j1 = j1;
+        this.j2 = j2;
+        this.j3 = j3;
+        this.j4 = j4;
+        this.s  = scanner;
+        this.servidor = null;
+        baralho = new Baralho();
+    }
 
+    // Construtor REDE
+    public Jogo(Jogador j1, Jogador j2, Jogador j3, Jogador j4,
+                List<ConexaoJogador> conexoes, Servidor servidor) {
+        this.j1       = j1;
+        this.j2       = j2;
+        this.j3       = j3;
+        this.j4       = j4;
+        this.conexoes = conexoes;
+        this.servidor = servidor;
+        baralho = new Baralho();
+    }
     
     public void adicionarPontos1(int pontos1) {
         this.pontos1 += pontos1;
@@ -57,28 +80,7 @@ public class Jogo {
         return c1.getValorBase() - c2.getValorBase();
     }
 
-
-    public Jogo() {
-        baralho = new Baralho();
-    }
-
-    public void CriarJogador(){
-
-        System.out.print("Nome do Jogador 1: ");
-        j1 = new Jogador(s.nextLine());
-
-        System.out.print("Nome do Jogador 2: ");
-        j2 = new Jogador(s.nextLine());
-
-        System.out.print("Nome do Jogador 3: ");
-        j3 = new Jogador(s.nextLine());
-
-        System.out.print("Nome do Jogador 4: ");
-        j4 = new Jogador(s.nextLine());
-
-    }
-
-    public void iniciar() {
+    public void iniciar() throws IOException {
 
         j1.limparMao();
         j2.limparMao();
@@ -96,134 +98,245 @@ public class Jogo {
         }
 
         Carta vira = baralho.comprar();
-        System.out.println("\n=== NOVA MÃO ===");
-        System.out.println("Vira: " + vira);
+        enviarMensagem("\n=== NOVA MÃO ===");
+        enviarMensagem("Vira: " + vira);
 
         manilha = proximacarta(vira.getValor());
-        System.out.println("Manilha: " + manilha);
+        enviarMensagem("Manilha: " + manilha);
 
-        System.out.println("\n=== TIMES ===");
-        System.out.println("Time 1: " + j1.getNome() + " e " + j2.getNome());
-        System.out.println("Time 2: " + j3.getNome() + " e " + j4.getNome());
+        enviarMensagem("\n=== TIMES ===");
+        enviarMensagem("Time 1: " + j1.getNome() + " e " + j3.getNome());
+        enviarMensagem("Time 2: " + j2.getNome() + " e " + j4.getNome());
+
+        // Manda as cartas individualmente se for rede
+        if (servidor != null) {
+            conexoes.get(0).enviarMao();
+            conexoes.get(1).enviarMao();
+            conexoes.get(2).enviarMao();
+            conexoes.get(3).enviarMao();
+        }
 
         rodadasTime1 = 0;
         rodadasTime2 = 0;
         valorMao = 1;
+        trucoJaPedido = false;
 
         rodada();
     }
 
-    private boolean pedirTruco(int timeQuePediu) {
-    
-    if (valorMao == 12) return false;
+    private boolean pedirTruco(int indiceJogador, int timeQuePediu) throws IOException {
 
-    System.out.println("Deseja pedir truco? (s/n)");
-    String resp = s.next().trim();
+        if (trucoJaPedido || valorMao == 12) return false;
 
-    if (resp.equalsIgnoreCase("s")) {
+        // =========================
+        // ===== MODO REDE ========
+        // =========================
+        if (servidor != null) {
+
+            ConexaoJogador quemPede = conexoes.get(indiceJogador);
+
+            // escolhe um adversário do outro time
+            ConexaoJogador adversario =
+                    (timeQuePediu == 1) ? conexoes.get(1) : conexoes.get(0);
+
+            quemPede.enviar("Deseja pedir truco? (s/n): ");
+
+            String resp;
+            
+            do {
+                resp = quemPede.recebe();
+            } while (resp == null || resp.trim().isEmpty());
+
+            if (!resp.trim().equalsIgnoreCase("s")) {
+                return false;
+            }
+
+            trucoJaPedido = true;
+
+            int valorAnterior = valorMao;
+            int novoValor;
+
+            switch (valorMao) {
+                case 1: novoValor = 3; break;
+                case 3: novoValor = 6; break;
+                case 6: novoValor = 9; break;
+                case 9: novoValor = 12; break;
+                default: return false;
+            }
+
+            servidor.enviarParaTodos(
+                "\nTRUCO pedido pelo Time " + timeQuePediu + "!"
+            );
+
+            adversario.enviar("Aceitam o truco? (s/n): ");
+
+            String aceita;
+            do {
+                aceita = adversario.recebe();
+            } while (aceita == null || aceita.trim().isEmpty());
+
+            if (aceita.trim().equalsIgnoreCase("n")) {
+                servidor.enviarParaTodos("Time adversário correu!");
+
+                if (timeQuePediu == 1)
+                    pontos1 += valorAnterior;
+                else
+                    pontos2 += valorAnterior;
+
+                return true; // encerra a mão
+            }
+
+            valorMao = novoValor;
+            servidor.enviarParaTodos(
+                "Truco aceito! Agora valendo " + valorMao + " pontos!"
+            );
+
+            return false;
+        }
+
+        // =========================
+        // ===== MODO LOCAL =======
+        // =========================
+        System.out.print("Deseja pedir truco? (s/n): ");
+        String resp = s.next().trim();
+
+        if (!resp.equalsIgnoreCase("s")) return false;
 
         trucoJaPedido = true;
 
-        if (valorMao == 1) valorMao = 3;
-        else if (valorMao == 3) valorMao = 6;
-        else if (valorMao == 6) valorMao = 9;
-        else if (valorMao == 9) valorMao = 12;
-        System.out.println("Truco valendo " + valorMao + " pontos!");
+        int valorAnterior = valorMao;
 
-        System.out.println("Time adversário aceita? (s/n)");
-        String resp2 = s.next().trim();
+        switch (valorMao) {
+            case 1: valorMao = 3; break;
+            case 3: valorMao = 6; break;
+            case 6: valorMao = 9; break;
+            case 9: valorMao = 12; break;
+            default: return false;
+        }
 
-        if (resp2.equalsIgnoreCase("n")) {
-            System.out.println("Time correu!");
+        System.out.print("Time adversário aceita? (s/n): ");
+        String aceita = s.next().trim();
 
-            if (timeQuePediu == 1) {
-                pontos1 += valorMao;
-            } else {
-                pontos2 += valorMao;
-            }
-
+        if (aceita.equalsIgnoreCase("n")) {
+            if (timeQuePediu == 1)
+                pontos1 += valorAnterior;
+            else
+                pontos2 += valorAnterior;
             return true;
         }
+
+        System.out.println("Truco aceito!");
+        return false;
     }
 
-    return false;
-}
     private int lerJogadaHost() {
         int escolha = s.nextInt() - 1;
         s.nextLine();
         return escolha;
     }
 
-    private void rodada() {
+    private void rodada() throws IOException {
 
-        System.out.println("--NOVA RODADA--\n");
+        enviarMensagem("--NOVA RODADA--\n");
 
         for (int i = 0; i < 3; i++) {
-            System.out.println("\n" + j1.getNome());
-            j1.mostrarMao();
-            if (pedirTruco(1)) return;
-            System.out.print("Escolha carta: ");
-            Carta c1 = j1.jogarCarta(s.nextInt()-1);
 
-            System.out.println("\n" + j2.getNome());
-            j2.mostrarMao();
-            if (pedirTruco(1)) return;
-            System.out.print("Escolha carta: ");
-            Carta c2 = j2.jogarCarta(s.nextInt()-1);
+            // J1 — índice 0 — Time 1
+            if (pedirTruco(0, 1)) return;
+            enviarMensagem("\n" + j1.getNome() + " escolha sua carta:");
+            Carta c1 = escolherCarta(j1, conexoes != null ? conexoes.get(0) : null);
 
-            System.out.println("\n" + j3.getNome());
-            j3.mostrarMao();
-            if (pedirTruco(2)) return;
-            System.out.print("Escolha carta: ");
-            Carta c3 = j3.jogarCarta(s.nextInt()-1);
+            // J2 — índice 1 — Time 2
+            if (pedirTruco(1, 2)) return;
+            enviarMensagem("\n" + j2.getNome() + " escolha sua carta:");
+            Carta c2 = escolherCarta(j2, conexoes != null ? conexoes.get(1) : null);
 
-            System.out.println("\n" + j4.getNome());
-            j4.mostrarMao();
-            if (pedirTruco(2)) return;
-            System.out.print("Escolha carta: ");
-            Carta c4 = j4.jogarCarta(s.nextInt()-1);
+            // J3 — índice 2 — Time 1
+            if (pedirTruco(2, 1)) return;
+            enviarMensagem("\n" + j3.getNome() + " escolha sua carta:");
+            Carta c3 = escolherCarta(j3, conexoes != null ? conexoes.get(2) : null);
 
-            System.out.println(j1.getNome() + " jogou: " + c1);
-            System.out.println(j2.getNome() + " jogou: " + c2);
-            System.out.println(j3.getNome() + " jogou: " + c3);
-            System.out.println(j4.getNome() + " jogou: " + c4);
+            // J4 — índice 3 — Time 2
+            if (pedirTruco(3, 2)) return;
+            enviarMensagem("\n" + j4.getNome() + " escolha sua carta:");
+            Carta c4 = escolherCarta(j4, conexoes != null ? conexoes.get(3) : null);
 
-            Carta[] cartas = {c1,c2,c3,c4};
+            enviarMensagem(j1.getNome() + " jogou: " + c1);
+            enviarMensagem(j2.getNome() + " jogou: " + c2);
+            enviarMensagem(j3.getNome() + " jogou: " + c3);
+            enviarMensagem(j4.getNome() + " jogou: " + c4);
+
+            Carta[] cartas = {c1, c2, c3, c4};
             int vencedor = 0;
-
-            for(int k = 1; k < cartas.length; k++){
-                if(compararCartas(cartas[k], cartas[vencedor]) > 0){
+            for (int k = 1; k < cartas.length; k++) {
+                if (compararCartas(cartas[k], cartas[vencedor]) > 0) {
                     vencedor = k;
                 }
             }
 
             if (vencedor == 0 || vencedor == 1) {
                 rodadasTime1++;
-                System.out.println("Time 1 ganhou a rodada!");
+                enviarMensagem("Time 1 ganhou a rodada!");
             } else {
                 rodadasTime2++;
-                System.out.println("Time 2 ganhou a rodada!");
+                enviarMensagem("Time 2 ganhou a rodada!");
             }
-            System.out.println("\n----------------------");
+            enviarMensagem("\n----------------------");
 
             if (rodadasTime1 == 2) {
-            pontos1 += valorMao;
-            System.out.println("Time 1 ganhou a mão!");
-            break;
+                pontos1 += valorMao;
+                enviarMensagem("Time 1 ganhou a mão!");
+                break;
+            }
+            if (rodadasTime2 == 2) {
+                pontos2 += valorMao;
+                enviarMensagem("Time 2 ganhou a mão!");
+                break;
+            }
         }
 
-        if (rodadasTime2 == 2) {
-            pontos2 += valorMao;
-            System.out.println("Time 2 ganhou a mão!");
-            break;
-        }
-        
-        }
         if (rodadasTime1 == rodadasTime2) {
-            System.out.println("Empate na mão!");
+            enviarMensagem("Empate na mão!");
         }
+        enviarMensagem("Placar -> Time 1: " + pontos1 + " | Time 2: " + pontos2);
+    }
 
-        System.out.println("Placar -> Time 1: " + pontos1 + " | Time 2: " + pontos2);
+    // Escolhe carta — local ou rede
+    private Carta escolherCarta(Jogador jogador, ConexaoJogador conexao) throws IOException {
+        if (conexao != null) {
+            // REDE — manda mão para o cliente e recebe escolha
+            conexao.enviarMao();
+            conexao.enviar("Escolha uma carta (1, 2 ou 3): ");
+            int escolha = -1;
+            while (escolha < 1 || escolha > jogador.getMao().size()) {
+                try {
+                    escolha = Integer.parseInt(conexao.recebe());
+                } catch (NumberFormatException e) {
+                    conexao.enviar("Inválido! Digite 1, 2 ou 3: ");
+                }
+            }
+            return jogador.jogarCarta(escolha - 1);
+        } else {
+            // LOCAL — usa o Scanner
+            jogador.mostrarMao();
+            System.out.print("Escolha carta (1, 2 ou 3): ");
+            int escolha = -1;
+            do {
+                escolha = s.nextInt();
+                if (escolha < 1 || escolha > jogador.getMao().size())
+                    System.out.print("Inválido! Escolha novamente: ");
+            } while (escolha < 1 || escolha > jogador.getMao().size());
+            return jogador.jogarCarta(escolha - 1);
+        }
+    }
+
+    // Envia mensagem — local ou rede
+    private void enviarMensagem(String mensagem) {
+        if (servidor != null) {
+            servidor.enviarParaTodos(mensagem);
+        } else {
+            System.out.println(mensagem);
+        }
     }
 
     public void AddRodadas(){
